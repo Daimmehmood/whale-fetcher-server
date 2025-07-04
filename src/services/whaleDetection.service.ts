@@ -7,13 +7,17 @@ import { logger } from '../utils/logger';
 
 export class WhaleDetectionService {
   private solPriceService = SolPriceService.getInstance();
-  private apiClient = axios.create({
-    timeout: 15000,
-    headers: {
-      'User-Agent': 'WhaleDetectionBot/1.0',
-      'Accept': 'application/json'
-    }
-  });
+ // Update constructor mein apiClient:
+private apiClient = axios.create({
+  timeout: 15000,
+  headers: {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'application/json',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache'
+  }
+});
 
   private readonly CONFIG = {
     MIN_BALANCE_USD: parseInt(process.env.MIN_BALANCE_USD || '50000'),
@@ -78,14 +82,18 @@ export class WhaleDetectionService {
   }
 
   private async getWalletBalance(walletAddress: string): Promise<WalletBalance | null> {
-    try {
-      // Get SOL balance
-      const solResponse = await this.apiClient.get(`https://public-api.solscan.io/account/${walletAddress}`);
-      const solBalance = solResponse.data?.lamports ? solResponse.data.lamports / 1000000000 : 0;
+  try {
+    // Use public API endpoints that work in browser
+    const solResponse = await this.apiClient.get(`https://api.solscan.io/account?address=${walletAddress}`);
+    const solBalance = solResponse.data?.data?.lamports ? solResponse.data.data.lamports / 1000000000 : 0;
 
-      // Get token balances
-      const tokensResponse = await this.apiClient.get(`https://public-api.solscan.io/account/tokens?account=${walletAddress}&limit=50`);
-      const tokens = tokensResponse.data?.data || [];
+    // Get token balances
+    const tokensResponse = await this.apiClient.get(`https://api.solscan.io/account/token?address=${walletAddress}`);
+    const tokens = tokensResponse.data?.data || [];
+
+
+    // Get token balances
+  
 
       let usdcBalance = 0;
       let totalTokensUsd = 0;

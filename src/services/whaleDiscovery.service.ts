@@ -69,30 +69,22 @@ export class WhaleDiscoveryService {
     ];
   }
 
-  private async getTopTokenHolders(tokenMint: string): Promise<string[]> {
-    try {
-      logger.info(`Getting top holders for token: ${tokenMint.substring(0, 8)}...`);
+private async getTopTokenHolders(tokenMint: string): Promise<string[]> {
+  try {
+    const response = await this.apiClient.get(`https://api.solscan.io/token/holders?address=${tokenMint}`);
+    
+    if (response.data?.data) {
+      const holders = response.data.data
+        .filter((holder: any) => parseFloat(holder.amount || '0') > this.CONFIG.MIN_HOLDER_AMOUNT)
+        .map((holder: any) => holder.address)
+        .slice(0, 50);
       
-      const response = await this.apiClient.get(`https://public-api.solscan.io/token/holders?tokenAddress=${tokenMint}&limit=100`);
-      
-      if (response.data?.data) {
-        const holders = response.data.data
-          .filter((holder: any) => {
-            const amount = parseFloat(holder.amount || '0');
-            return amount > this.CONFIG.MIN_HOLDER_AMOUNT;
-          })
-          .map((holder: any) => holder.owner)
-          .filter((owner: string) => Helpers.isValidSolanaAddress(owner))
-          .slice(0, 50); // Top 50 holders
-
-        logger.info(`Found ${holders.length} significant holders for ${tokenMint.substring(0, 8)}`);
-        return holders;
-      }
-      
-      return [];
-    } catch (error) {
-      logger.error(`Error getting token holders for ${tokenMint}`, error);
-      return [];
+      return holders;
+    }
+    return [];
+  } catch (error) {
+    logger.error('Error getting token holders', error);
+    return [];
     }
   }
 
