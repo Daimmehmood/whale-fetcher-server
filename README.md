@@ -497,7 +497,7 @@ MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 📞 Support
 
-For support, email your-email@example.com or create an issue on GitHub.
+For support, email daimmehmood37@gmail.com or create an issue on GitHub.
 
 ---
 
