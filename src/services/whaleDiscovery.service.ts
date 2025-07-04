@@ -185,7 +185,7 @@ export class WhaleDiscoveryService {
           
           await Helpers.sleep(300); // Rate limiting
         } catch (error) {
-          logger.warn(`Error getting users for protocol ${protocolId}:`, error);
+          logger.warn(`Error getting users for protocol ${protocolId}:`);
           continue;
         }
       }
@@ -201,5 +201,4 @@ export class WhaleDiscoveryService {
   }
 }
 
-// Export all services
-export { WhaleDiscoveryService };
+

@@ -114,3 +114,4 @@ export class SolPriceService {
     return Date.now() - this.lastUpdate > this.updateInterval * 2;
   }
 }
+
