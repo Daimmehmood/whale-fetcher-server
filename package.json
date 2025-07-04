@@ -1,25 +1,54 @@
 {
-  "name": "whale-fetcher-server",
+  "name": "whale-wallet-fetcher-server",
   "version": "1.0.0",
-  "description": "Whale Wallet Discovery & Fetching API Server",
+  "description": "Whale Wallet Discovery & Fetching API Server for Render.com",
   "main": "dist/server.js",
   "scripts": {
     "start": "node dist/server.js",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
     "build:render": "npm install && npm run build",
-    "test": "echo \"No tests specified\" && exit 0"
+    "test": "echo \"No tests specified\" && exit 0",
+    "clean": "rm -rf dist",
+    "lint": "echo \"No linting configured\" && exit 0"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "type": "commonjs",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "axios": "^1.6.2",
+    "node-schedule": "^2.1.1",
+    "express-rate-limit": "^7.1.5"
+  },
   "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.3",
-    "@types/node": "^24.0.10",
-    "@types/node-schedule": "^2.1.7",
-    "ts-node-dev": "^2.0.0",
-    "typescript": "^5.8.3"
-  }
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17",
+    "@types/node": "^20.10.4",
+    "@types/node-schedule": "^2.1.4",
+    "typescript": "^5.3.3",
+    "ts-node-dev": "^2.0.0"
+  },
+  "keywords": [
+    "whale",
+    "wallet",
+    "fetcher",
+    "solana",
+    "trading",
+    "api",
+    "server",
+    "defi",
+    "crypto"
+  ],
+  "author": "Whale Bot Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/daimmehmood/whale-fetcher-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/daimmehmood/whale-fetcher-server/issues"
+  },
+  "homepage": "https://github.com/daimmehmood/whale-fetcher-server#readme"
 }
+
