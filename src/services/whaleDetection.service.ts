@@ -49,7 +49,7 @@ export class WhaleDetectionService {
       }
 
       // Get transaction history and stats
-      const stats = await this.getWalletStatsRPC(walletAddress);
+      let stats = await this.getWalletStatsRPC(walletAddress);
       if (!stats) {
         // Generate basic stats for wallets with high balance
         const basicStats = this.generateBasicStats(balance);

@@ -1,9 +1,9 @@
-// src/routes/whale.routes.ts
+// src/routes/whale.routes.ts - FIXED VERSION
 import { Router, Request, Response } from 'express';
 import { WhaleDetectionService } from '../services/whaleDetection.service';
 import { WhaleDiscoveryService } from '../services/whaleDiscovery.service';
 import { SolPriceService } from '../services/solPrice.service';
-import { WhaleStorage } from '../utils/storage'; // ADD THIS
+import { WhaleStorage } from '../utils/storage';
 import { WhaleWallet, FetchResult } from '../types/whale.types';
 import { logger } from '../utils/logger';
 import { Helpers } from '../utils/helpers';
@@ -13,9 +13,9 @@ const router = Router();
 // Initialize storage
 const storage = new WhaleStorage(); 
 
-// In-memory storage (for simple deployment)
+// Load existing whales from JSON on startup
 let whaleWallets: WhaleWallet[] = storage.loadWhales();
-let lastFetchTime: Date | null = null;
+let lastFetchTime: Date | null = whaleWallets.length > 0 ? new Date() : null;
 let isProcessing: boolean = false;
 
 // Initialize services
@@ -41,7 +41,7 @@ function saveToStorage(): void {
   }
 }
 
-// Main whale fetcher function (UPDATED)
+// Main whale fetcher function
 async function fetchWhales(): Promise<FetchResult> {
   if (isProcessing) {
     return {
@@ -57,7 +57,7 @@ async function fetchWhales(): Promise<FetchResult> {
     };
   }
 
-   isProcessing = true;
+  isProcessing = true;
   const startTime = Date.now();
   
   try {
@@ -109,7 +109,7 @@ async function fetchWhales(): Promise<FetchResult> {
     // SAVE TO JSON FILE
     saveToStorage();
     
-     const fetchTime = Date.now() - startTime;
+    const fetchTime = Date.now() - startTime;
     lastFetchTime = new Date();
     
     const highValueWallets = whaleWallets.filter(w => w.balance.totalBalanceUsd >= CONFIG.MIN_BALANCE_USD).length;
@@ -150,23 +150,21 @@ async function fetchWhales(): Promise<FetchResult> {
   }
 }
 
-// ADD NEW ROUTE: Get storage info
+// 📡 ROUTES
+
+// Get storage info
 router.get('/storage', (req: Request, res: Response): void => {
   const stats = storage.getStats();
-  const paths = storage.getFilePaths();
   
   res.json({
     success: true,
     storage: {
       ...stats,
-      filePaths: paths,
       currentWallets: whaleWallets.length,
       lastSaved: lastFetchTime?.toISOString() || null
     }
   });
 });
-
-// 📡 ROUTES
 
 // Get all whale wallets with filtering
 router.get('/whales', (req: Request, res: Response): void => {
@@ -234,7 +232,27 @@ router.get('/whales/:address', (req: Request, res: Response): void => {
   });
 });
 
-// Fetch new whales manually
+// *** SINGLE POST ROUTE - Fetch new whales manually ***
+router.post('/fetch', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await fetchWhales();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: `Fetch failed: ${error}`,
+      data: {
+        newWallets: 0,
+        updatedWallets: 0,
+        totalWallets: whaleWallets.length,
+        highValueWallets: 0,
+        fetchTime: 0
+      }
+    });
+  }
+});
+
+// Analyze specific wallet
 router.post('/analyze/:address', async (req: Request, res: Response): Promise<void> => {
   const { address } = req.params;
   
@@ -376,73 +394,6 @@ router.get('/stats', (req: Request, res: Response): void => {
     success: true,
     stats
   });
-});
-
-// Analyze specific wallet
-router.post('/analyze/:address', async (req: Request, res: Response): Promise<void> => {
-  const { address } = req.params;
-  
-  if (!Helpers.isValidSolanaAddress(address)) {
-    res.status(400).json({
-      success: false,
-      message: 'Invalid Solana wallet address'
-    });
-    return;
-  }
-
-  if (isProcessing) {
-    res.status(429).json({
-      success: false,
-      message: 'Analysis already in progress, please try again later'
-    });
-    return;
-  }
-
-  try {
-    logger.info(`Manual analysis requested for wallet: ${address}`);
-    
-    const whaleData = await whaleDetection.analyzeWalletFromSolscan(address);
-    
-    if (whaleData) {
-      // Check if wallet already exists
-      const existingIndex = whaleWallets.findIndex(w => w.address === address);
-      
-      if (existingIndex >= 0) {
-        // Update existing wallet
-        whaleWallets[existingIndex] = { 
-          ...whaleData, 
-          discoveredDate: whaleWallets[existingIndex].discoveredDate 
-        };
-      } else {
-        // Add new whale
-        whaleWallets.push(whaleData);
-      }
-      
-      res.json({
-        success: true,
-        message: 'Wallet analyzed successfully',
-        whale: whaleData,
-        isNewWallet: existingIndex < 0
-      });
-    } else {
-      res.json({
-        success: false,
-        message: 'Wallet does not meet whale criteria',
-        criteria: {
-          minBalance: CONFIG.MIN_BALANCE_USD,
-          minWinRate: CONFIG.MIN_WIN_RATE,
-          minTransactions: CONFIG.MIN_TRANSACTIONS
-        }
-      });
-    }
-    
-  } catch (error) {
-    logger.error(`Error analyzing wallet ${address}`, error);
-    res.status(500).json({
-      success: false,
-      message: `Analysis failed: ${error}`
-    });
-  }
 });
 
 // Get wallet performance summary
