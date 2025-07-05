@@ -3,14 +3,18 @@ import { Router, Request, Response } from 'express';
 import { WhaleDetectionService } from '../services/whaleDetection.service';
 import { WhaleDiscoveryService } from '../services/whaleDiscovery.service';
 import { SolPriceService } from '../services/solPrice.service';
+import { WhaleStorage } from '../utils/storage'; // ADD THIS
 import { WhaleWallet, FetchResult } from '../types/whale.types';
 import { logger } from '../utils/logger';
 import { Helpers } from '../utils/helpers';
 
 const router = Router();
 
+// Initialize storage
+const storage = new WhaleStorage(); 
+
 // In-memory storage (for simple deployment)
-let whaleWallets: WhaleWallet[] = [];
+let whaleWallets: WhaleWallet[] = storage.loadWhales();
 let lastFetchTime: Date | null = null;
 let isProcessing: boolean = false;
 
@@ -21,13 +25,23 @@ const solPriceService = SolPriceService.getInstance();
 
 // Configuration
 const CONFIG = {
-  MIN_BALANCE_USD: parseInt(process.env.MIN_BALANCE_USD || '50000'),
-  MIN_WIN_RATE: parseInt(process.env.MIN_WIN_RATE || '50'),
-  MIN_TRANSACTIONS: parseInt(process.env.MIN_TRANSACTIONS || '10'),
-  MAX_WALLETS_TO_FETCH: parseInt(process.env.MAX_WALLETS_TO_FETCH || '50')
+  MIN_BALANCE_USD: parseInt(process.env.MIN_BALANCE_USD || '10000'),
+  MIN_WIN_RATE: parseInt(process.env.MIN_WIN_RATE || '30'),
+  MIN_TRANSACTIONS: parseInt(process.env.MIN_TRANSACTIONS || '5'),
+  MAX_WALLETS_TO_FETCH: parseInt(process.env.MAX_WALLETS_TO_FETCH || '30')
 };
 
-// Main whale fetcher function
+// Auto-save function
+function saveToStorage(): void {
+  try {
+    storage.saveWhales(whaleWallets);
+    logger.success(`💾 Auto-saved ${whaleWallets.length} whales to JSON`);
+  } catch (error) {
+    logger.error('❌ Auto-save failed:', error);
+  }
+}
+
+// Main whale fetcher function (UPDATED)
 async function fetchWhales(): Promise<FetchResult> {
   if (isProcessing) {
     return {
@@ -43,7 +57,7 @@ async function fetchWhales(): Promise<FetchResult> {
     };
   }
 
-  isProcessing = true;
+   isProcessing = true;
   const startTime = Date.now();
   
   try {
@@ -65,27 +79,22 @@ async function fetchWhales(): Promise<FetchResult> {
       const walletAddress = potentialWallets[i];
       
       try {
-        // Check if wallet already exists
         const existingIndex = whaleWallets.findIndex(w => w.address === walletAddress);
-        
         const whaleData = await whaleDetection.analyzeWalletFromSolscan(walletAddress);
         
         if (whaleData) {
           if (existingIndex >= 0) {
-            // Update existing wallet
             whaleWallets[existingIndex] = { 
               ...whaleData, 
               discoveredDate: whaleWallets[existingIndex].discoveredDate 
             };
             updatedWallets++;
           } else {
-            // Add new whale
             whaleWallets.push(whaleData);
             newWallets++;
           }
         }
         
-        // Add small delay to avoid rate limiting
         await Helpers.sleep(200);
         
       } catch (error) {
@@ -97,12 +106,16 @@ async function fetchWhales(): Promise<FetchResult> {
     // Sort wallets by balance
     whaleWallets.sort((a, b) => b.balance.totalBalanceUsd - a.balance.totalBalanceUsd);
     
-    const fetchTime = Date.now() - startTime;
+    // SAVE TO JSON FILE
+    saveToStorage();
+    
+     const fetchTime = Date.now() - startTime;
     lastFetchTime = new Date();
     
     const highValueWallets = whaleWallets.filter(w => w.balance.totalBalanceUsd >= CONFIG.MIN_BALANCE_USD).length;
     
-    logger.success(`Whale fetch completed: ${newWallets} new, ${updatedWallets} updated, ${errors.length} errors`);
+    logger.success(`✅ Whale fetch completed: ${newWallets} new, ${updatedWallets} updated, ${errors.length} errors`);
+    logger.success(`💾 Data saved to JSON files`);
     
     return {
       success: true,
@@ -119,7 +132,7 @@ async function fetchWhales(): Promise<FetchResult> {
     };
     
   } catch (error) {
-    logger.error('Whale fetch failed', error);
+    logger.error('❌ Whale fetch failed', error);
     return {
       success: false,
       message: `Whale fetch failed: ${error}`,
@@ -136,6 +149,22 @@ async function fetchWhales(): Promise<FetchResult> {
     isProcessing = false;
   }
 }
+
+// ADD NEW ROUTE: Get storage info
+router.get('/storage', (req: Request, res: Response): void => {
+  const stats = storage.getStats();
+  const paths = storage.getFilePaths();
+  
+  res.json({
+    success: true,
+    storage: {
+      ...stats,
+      filePaths: paths,
+      currentWallets: whaleWallets.length,
+      lastSaved: lastFetchTime?.toISOString() || null
+    }
+  });
+});
 
 // 📡 ROUTES
 
@@ -206,21 +235,68 @@ router.get('/whales/:address', (req: Request, res: Response): void => {
 });
 
 // Fetch new whales manually
-router.post('/fetch', async (req: Request, res: Response): Promise<void> => {
+router.post('/analyze/:address', async (req: Request, res: Response): Promise<void> => {
+  const { address } = req.params;
+  
+  if (!Helpers.isValidSolanaAddress(address)) {
+    res.status(400).json({
+      success: false,
+      message: 'Invalid Solana wallet address'
+    });
+    return;
+  }
+
+  if (isProcessing) {
+    res.status(429).json({
+      success: false,
+      message: 'Analysis already in progress, please try again later'
+    });
+    return;
+  }
+
   try {
-    const result = await fetchWhales();
-    res.json(result);
+    logger.info(`🔍 Manual analysis requested for wallet: ${address}`);
+    
+    const whaleData = await whaleDetection.analyzeWalletFromSolscan(address);
+    
+    if (whaleData) {
+      const existingIndex = whaleWallets.findIndex(w => w.address === address);
+      
+      if (existingIndex >= 0) {
+        whaleWallets[existingIndex] = { 
+          ...whaleData, 
+          discoveredDate: whaleWallets[existingIndex].discoveredDate 
+        };
+      } else {
+        whaleWallets.push(whaleData);
+      }
+      
+      // AUTO-SAVE AFTER MANUAL ANALYSIS
+      saveToStorage();
+      
+      res.json({
+        success: true,
+        message: 'Wallet analyzed and saved successfully',
+        whale: whaleData,
+        isNewWallet: existingIndex < 0
+      });
+    } else {
+      res.json({
+        success: false,
+        message: 'Wallet does not meet whale criteria',
+        criteria: {
+          minBalance: CONFIG.MIN_BALANCE_USD,
+          minWinRate: CONFIG.MIN_WIN_RATE,
+          minTransactions: CONFIG.MIN_TRANSACTIONS
+        }
+      });
+    }
+    
   } catch (error) {
+    logger.error(`❌ Error analyzing wallet ${address}`, error);
     res.status(500).json({
       success: false,
-      message: `Fetch failed: ${error}`,
-      data: {
-        newWallets: 0,
-        updatedWallets: 0,
-        totalWallets: whaleWallets.length,
-        highValueWallets: 0,
-        fetchTime: 0
-      }
+      message: `Analysis failed: ${error}`
     });
   }
 });
