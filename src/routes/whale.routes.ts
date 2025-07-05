@@ -439,7 +439,7 @@ router.get('/performance', (req: Request, res: Response): void => {
       .sort((a, b) => b.stats.winRate - a.stats.winRate)
       .slice(0, 10)
       .map(w => ({
-        address: w.address.substring(0, 8) + '...',
+        address: w.address.substring(0, 8) + '....',
         name: w.name,
         winRate: w.stats.winRate,
         balance: w.balance.totalBalanceUsd,
