@@ -1,16 +1,16 @@
 {
-  "name": "whale-wallet-fetcher-server",
-  "version": "1.0.0",
-  "description": "Whale Wallet Discovery & Fetching API Server for Render.com",
-  "main": "dist/server.js",
+  "name": "ultra-fast-whale-tracker",
+  "version": "2.0.0",
+  "description": "Ultra-Fast Helius Whale Tracker - 1000 wallets, sub-100ms responses",
+  "main": "dist/enhanced-server.js",
   "scripts": {
-    "start": "node dist/server.js",
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "start": "node dist/enhanced-server.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/enhanced-server.ts",
     "build": "tsc",
     "build:render": "npm install && npm run build",
-    "test": "echo \"No tests specified\" && exit 0",
+    "test": "echo \"Performance tests coming soon\" && exit 0",
     "clean": "rm -rf dist",
-    "lint": "echo \"No linting configured\" && exit 0"
+    "monitor": "node dist/utils/monitor.js"
   },
   "type": "commonjs",
   "dependencies": {
